@@ -32,7 +32,10 @@ class UserService {
     }
 
     private static _clearSearchParams(): void {
-        window.history.replaceState({}, '', window.location.pathname);
+        let searchParams = new URLSearchParams(window.location.search);
+        searchParams.delete('user');
+        let newUrl = window.location.pathname + '?' + searchParams.toString();
+        window.history.replaceState({}, '', newUrl);
     }
 
     private static _deleteById(id: number): void {
