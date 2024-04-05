@@ -14,14 +14,25 @@ interface IInput {
 
 class UserService {
     private static readonly _usersKey = 'users';
+    private static _button = document.querySelector('button') as HTMLButtonElement;
+    static userForm = document.forms['userForm'] as HTMLFormElement;
 
     private static _getAll(): IUser[] {
         return JSON.parse(localStorage.getItem(this._usersKey)) || [];
     }
 
-    private static _setToStorage(data: IUser[]): void {
+    private static _getCurrentUser(): IUser {
+        let searchParams = new URLSearchParams(window.location.search);
+        return JSON.parse(searchParams.get('user')) as IUser;
+    }
+
+    static _setToStorage(data: IUser[]): void {
         localStorage.setItem(this._usersKey, JSON.stringify(data));
         this.renderHTML();
+    }
+
+    private static _clearSearchParams(): void {
+        window.history.replaceState({}, '', window.location.pathname);
     }
 
     private static _deleteById(id: number): void {
@@ -31,11 +42,32 @@ class UserService {
         this._setToStorage(users);
     }
 
-    static create(data: IUserForm): void {
+    static createUpdate(data: IUserForm): void {
         const users = this._getAll();
-        let id = users.length ? users.slice(-1)[0].id + 1 : 1;
-        users.push({id, ...data});
-        this._setToStorage(users);
+        const currentUser = this._getCurrentUser();
+        if (currentUser) {
+            let index = users.findIndex(user => user.id === currentUser.id);
+            users[index] = {id: currentUser.id, ...data};
+            this._setToStorage(users);
+            this._button.innerText = 'create';
+            this._clearSearchParams()
+
+        } else {
+            let id = users.length ? users.slice(-1)[0].id + 1 : 1;
+            users.push({id, ...data});
+            this._setToStorage(users);
+        }
+    }
+
+    private static _setUserUpdate(user: IUser) {
+        const {name: nameInput, age: ageInput} = this.userForm as any as IInput;
+        nameInput.value = user.name;
+        ageInput.value = user.age.toString();
+        // localStorage.setItem(this._currentUser, JSON.stringify(user));
+        let searchParams = new URLSearchParams(window.location.search);
+        searchParams.set('user', JSON.stringify(user));
+        let newUrl = window.location.pathname + '?' + searchParams.toString();
+        window.history.pushState({path: newUrl}, '', newUrl);
     }
 
     static renderHTML(): void {
@@ -48,11 +80,15 @@ class UserService {
             const buttonsBlock = document.createElement('div');
             const buttonDelete = document.createElement('button');
             buttonDelete.innerText = 'delete';
-            buttonDelete.onclick = () => {
+            buttonDelete.onclick = (): void => {
                 this._deleteById(user.id);
             }
             const buttonUpdate = document.createElement('button');
             buttonUpdate.innerText = 'update';
+            buttonUpdate.onclick = () => {
+                this._button.innerText = 'update';
+                this._setUserUpdate(user)
+            }
             buttonsBlock.append(buttonDelete, buttonUpdate);
             userBlock.append(userContent, buttonsBlock, document.createElement('br'));
             return userBlock;
@@ -66,10 +102,10 @@ class UserService {
 }
 
 UserService.renderHTML();
-let userForm = document.forms['userForm'] as HTMLFormElement;
+const userForm = UserService.userForm
+const {name: nameInput, age: ageInput} = userForm as any as IInput;
 userForm.onsubmit = (e: SubmitEvent): void => {
     e.preventDefault();
-    const {name: nameInput, age: ageInput} = userForm as any as IInput;
-    UserService.create({name: nameInput.value, age: +ageInput.value});
+    UserService.createUpdate({name: nameInput.value, age: +ageInput.value});
     userForm.reset();
 }
